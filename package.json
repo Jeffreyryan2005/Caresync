@@ -3,11 +3,18 @@
   "version": "1.0.0",
   "description": "Alexa+ CareSync: Next-Gen Autonomous Health & Smart-Home Agent with Model Context Protocol (MCP) and AWS Bedrock",
   "scripts": {
+    "build": "cd client && npm install && npm run build",
     "install:all": "npm install && cd server && npm install && cd ../client && npm install",
     "server": "cd server && npm run dev",
     "client": "cd client && npm run dev",
     "dev": "node dev-runner.js",
     "start": "node dev-runner.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-bedrock-runtime": "^3.750.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
   },
   "keywords": [
     "alexa-plus",

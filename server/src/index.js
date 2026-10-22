@@ -264,12 +264,16 @@ app.post("/api/reset", (req, res) => {
   res.json({ success: true, message: "Demo state reset to nominal baseline." });
 });
 
-app.listen(PORT, () => {
-  console.log(`\n=====================================================`);
-  console.log(`  🌟 Alexa+ CareSync MCP Server is LIVE on Port ${PORT} `);
-  console.log(`  - MCP JSON-RPC 2.0 Endpoint: http://localhost:${PORT}/mcp`);
-  console.log(`  - MCP Server-Sent Events:    http://localhost:${PORT}/sse`);
-  console.log(`  - Conversational Agent API:   http://localhost:${PORT}/api/chat`);
-  console.log(`  - AWS Bedrock Engine Mode:   ${getEngineStatus().mode}`);
-  console.log(`=====================================================\n`);
-});
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`\n=====================================================`);
+    console.log(`  🌟 Alexa+ CareSync MCP Server is LIVE on Port ${PORT} `);
+    console.log(`  - MCP JSON-RPC 2.0 Endpoint: http://localhost:${PORT}/mcp`);
+    console.log(`  - MCP Server-Sent Events:    http://localhost:${PORT}/sse`);
+    console.log(`  - Conversational Agent API:   http://localhost:${PORT}/api/chat`);
+    console.log(`  - AWS Bedrock Engine Mode:   ${getEngineStatus().mode}`);
+    console.log(`=====================================================\n`);
+  });
+}
+
+export default app;
