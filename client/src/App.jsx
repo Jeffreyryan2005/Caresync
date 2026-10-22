@@ -5,45 +5,45 @@ import {
   Send, 
   Volume2, 
   VolumeX, 
-  Terminal, 
+  Settings, 
+  Shield, 
   ShieldAlert, 
   Pill, 
-  HeartPulse, 
-  Home, 
+  Activity, 
+  Lock, 
+  Unlock, 
+  Sun, 
+  Thermometer, 
+  Video, 
   Calendar, 
-  RotateCcw, 
-  CheckCircle, 
-  Sparkles,
-  Lock,
-  Unlock,
-  Lightbulb,
-  Thermometer,
-  Video,
-  Clock,
-  Wifi,
-  Info
+  CheckCircle2, 
+  Circle, 
+  Clock, 
+  Wifi, 
+  ChevronRight, 
+  UserCheck, 
+  PhoneCall,
+  X,
+  FileCode,
+  Terminal,
+  RefreshCw
 } from 'lucide-react';
-import confetti from 'canvas-confetti';
 import Inspector from './components/Inspector';
 
 export default function App() {
   const [inputText, setInputText] = useState('');
   const [isListening, setIsListening] = useState(false);
-  const [orbState, setOrbState] = useState('IDLE'); // 'IDLE', 'LISTENING', 'THINKING', 'SPEAKING', 'EMERGENCY'
+  const [alexaState, setAlexaState] = useState('IDLE'); // 'IDLE' | 'LISTENING' | 'THINKING' | 'SPEAKING' | 'ALERT'
   const [messages, setMessages] = useState([
     {
-      id: 'welcome',
+      id: 'init-1',
       role: 'assistant',
-      text: "Good morning, Eleanor! I'm here running on your Echo Show with full ambient CareSync intelligence. All your vitals are steady, your morning Lisinopril is logged, and the home is comfortable at 72°F. How are you feeling today?",
-      auiCard: {
-        type: 'WELLNESS_BRIEF',
-        title: '☀️ Alexa+ Ambient Morning Briefing',
-        patient: 'Eleanor Vance',
-        vitals: { heartRate: 78, bloodPressure: '128/82 mmHg', spo2: '98%', bloodGlucose: '110 mg/dL' }
-      }
+      text: "Good morning, Eleanor. Your resting heart rate is 78 bpm, and your morning Lisinopril is logged. Ring perimeter sensors report all entry points secured. How can I assist you right now?",
+      timestamp: '08:00 AM',
+      type: 'STATUS_SUMMARY'
     }
   ]);
-  const [activeCard, setActiveCard] = useState(messages[0].auiCard);
+  const [activeCard, setActiveCard] = useState(null);
   const [systemStatus, setSystemStatus] = useState(null);
   const [careState, setCareState] = useState(null);
   const [isInspectorOpen, setIsInspectorOpen] = useState(false);
@@ -54,13 +54,13 @@ export default function App() {
   const chatEndRef = useRef(null);
   const recognitionRef = useRef(null);
 
-  // Clock ticker for Echo Show header
+  // Sync clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  // Fetch initial system status and care state
+  // Fetch backend data
   const fetchData = async () => {
     try {
       const [resStatus, resState] = await Promise.all([
@@ -78,37 +78,35 @@ export default function App() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(fetchData, 4000);
+    const interval = setInterval(fetchData, 3000);
     return () => clearInterval(interval);
   }, []);
 
-  // Scroll to bottom of chat
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Web Speech Synthesis (Alexa voice)
+  // Speech Synthesis
   const speakText = (text) => {
     if (!isSpeechEnabled || !window.speechSynthesis) return;
     window.speechSynthesis.cancel();
+
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.05;
-    utterance.pitch = 1.02;
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
 
     const voices = window.speechSynthesis.getVoices();
-    const naturalVoice = voices.find(v => v.lang.includes('en') && (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Samantha') || v.name.includes('Zira'))) || voices[0];
-    if (naturalVoice) utterance.voice = naturalVoice;
+    const cleanVoice = voices.find(v => v.lang.startsWith('en') && (v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Google'))) || voices[0];
+    if (cleanVoice) utterance.voice = cleanVoice;
 
-    utterance.onstart = () => setOrbState('SPEAKING');
-    utterance.onend = () => {
-      setOrbState(activeCard?.type === 'EMERGENCY_ALERT' ? 'EMERGENCY' : 'IDLE');
-    };
-    utterance.onerror = () => setOrbState('IDLE');
+    utterance.onstart = () => setAlexaState('SPEAKING');
+    utterance.onend = () => setAlexaState(activeCard?.type === 'EMERGENCY_ALERT' ? 'ALERT' : 'IDLE');
+    utterance.onerror = () => setAlexaState('IDLE');
 
     window.speechSynthesis.speak(utterance);
   };
 
-  // Web Speech Recognition (Mic Voice Input)
+  // Speech Recognition (Web Speech API)
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
@@ -119,7 +117,7 @@ export default function App() {
 
       recognition.onstart = () => {
         setIsListening(true);
-        setOrbState('LISTENING');
+        setAlexaState('LISTENING');
       };
 
       recognition.onresult = (event) => {
@@ -130,7 +128,7 @@ export default function App() {
 
       recognition.onerror = () => {
         setIsListening(false);
-        setOrbState('IDLE');
+        setAlexaState('IDLE');
       };
 
       recognition.onend = () => {
@@ -143,30 +141,34 @@ export default function App() {
 
   const toggleListening = () => {
     if (!recognitionRef.current) {
-      alert("Voice input is supported in Google Chrome, Microsoft Edge, and Safari.");
+      alert("Microphone recognition requires a supported browser (Chrome, Edge, Safari).");
       return;
     }
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
-      setOrbState('IDLE');
+      setAlexaState('IDLE');
     } else {
       window.speechSynthesis?.cancel();
       recognitionRef.current.start();
     }
   };
 
-  // Send message to backend
   const handleSendMessage = async (textToSend) => {
     const query = (textToSend || inputText).trim();
     if (!query) return;
 
     setInputText('');
-    setOrbState('THINKING');
+    setAlexaState('THINKING');
 
     const newMessages = [
       ...messages,
-      { id: `user_${Date.now()}`, role: 'user', text: query }
+      {
+        id: `user-${Date.now()}`,
+        role: 'user',
+        text: query,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      }
     ];
     setMessages(newMessages);
 
@@ -188,19 +190,17 @@ export default function App() {
         if (auiCard) {
           setActiveCard(auiCard);
           if (auiCard.type === 'EMERGENCY_ALERT') {
-            setOrbState('EMERGENCY');
-            confetti({ particleCount: 40, spread: 60, origin: { y: 0.8 }, colors: ['#ef4444', '#dc2626'] });
-          } else if (auiCard.type === 'MEDICATION_SCHEDULE') {
-            confetti({ particleCount: 30, spread: 50, origin: { y: 0.8 }, colors: ['#10b981', '#06b6d4'] });
+            setAlexaState('ALERT');
           }
         }
 
         setMessages(prev => [
           ...prev,
           {
-            id: `asst_${Date.now()}`,
+            id: `asst-${Date.now()}`,
             role: 'assistant',
             text,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
             auiCard,
             toolCalls
           }
@@ -211,220 +211,230 @@ export default function App() {
       }
     } catch (err) {
       console.error("Message processing failed:", err);
-      setOrbState('IDLE');
+      setAlexaState('IDLE');
     }
   };
 
-  // Reset Demo State
-  const handleResetDemo = async () => {
+  const handleToggleDoor = async () => {
     try {
-      await fetch('/api/reset', { method: 'POST' });
+      const newAction = careState?.smartHome?.frontDoorLocked ? 'unlock' : 'lock';
+      await fetch('/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'tools/call',
+          params: {
+            name: 'smart_home_control',
+            arguments: { deviceType: 'smart_lock', action: newAction }
+          }
+        })
+      });
       fetchData();
-      setOrbState('IDLE');
-      setActiveCard(messages[0].auiCard);
-      alert("Demo state reset to clean baseline!");
     } catch (e) {
-      console.warn("Reset error:", e);
+      console.warn("Toggle failed:", e);
     }
+  };
+
+  const handleToggleMedication = async (medName) => {
+    try {
+      await fetch('/mcp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: Date.now(),
+          method: 'tools/call',
+          params: {
+            name: 'verify_medication',
+            arguments: { medicationName: medName, action: 'mark_taken' }
+          }
+        })
+      });
+      fetchData();
+    } catch (e) {
+      console.warn("Med toggle failed:", e);
+    }
+  };
+
+  const handleReset = async () => {
+    await fetch('/api/reset', { method: 'POST' });
+    setActiveCard(null);
+    setAlexaState('IDLE');
+    fetchData();
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col overflow-hidden relative selection:bg-cyan-500 selection:text-white">
-      {/* Background Ambient Aura */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-cyan-600/10 rounded-full blur-[140px] pointer-events-none"></div>
-      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-[140px] pointer-events-none"></div>
-
-      {/* TOP BAR: Echo Show 15 Smart Display Header */}
-      <header className="px-6 py-3 border-b border-slate-800/80 glass-panel flex items-center justify-between z-10">
-        <div className="flex items-center gap-4">
+    <div className="min-h-screen bg-[#0b0f17] text-slate-100 flex flex-col justify-between font-sans selection:bg-[#00a8e1]">
+      
+      {/* 1. TOP STATUS BAR (Authentic Echo Show 15 OS) */}
+      <header className="h-14 px-6 border-b border-white/[0.06] bg-[#0e141f] flex items-center justify-between text-xs tracking-wide select-none">
+        <div className="flex items-center gap-5">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center shadow-lg shadow-cyan-500/20">
-              <Sparkles className="w-4 h-4 text-white" />
+            <div className="w-6 h-6 rounded-md bg-[#00a8e1] flex items-center justify-center font-bold text-[11px] text-white tracking-tighter">
+              a
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm tracking-wide text-white">Alexa+ CareSync</span>
-                <span className="px-1.5 py-0.5 rounded text-[10px] bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 font-mono">
-                  Echo Show 15
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400">Autonomous Health & Smart Home Agent • Model Context Protocol</p>
-            </div>
+            <span className="font-semibold text-slate-100 text-sm tracking-tight">Alexa+ CareSync</span>
+            <span className="px-2 py-0.5 rounded text-[10px] bg-slate-800 text-slate-400 font-mono border border-slate-700/60">
+              Echo Show 15
+            </span>
           </div>
 
-          <div className="hidden md:flex items-center gap-2 pl-4 border-l border-slate-800 text-xs text-slate-400">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            <span>Patient: <strong className="text-slate-200">Eleanor Vance (Age 72)</strong></span>
+          <div className="hidden md:flex items-center gap-4 pl-4 border-l border-white/10 text-slate-400 text-[11px]">
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-3.5 h-3.5 text-slate-400" />
+              <span>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Sun className="w-3.5 h-3.5 text-amber-400/80" />
+              <span>71°F Seattle</span>
+            </div>
+            <div className="flex items-center gap-1.5 text-emerald-400">
+              <Wifi className="w-3.5 h-3.5" />
+              <span>Connected</span>
+            </div>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Engine Mode Badge */}
-          <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-900 border border-slate-700/60 text-xs">
-            <div className={`w-2 h-2 rounded-full ${systemStatus?.engine?.mode === 'LIVE_AWS_BEDROCK' ? 'bg-amber-400' : 'bg-cyan-400'}`}></div>
-            <span className="text-slate-300 font-mono text-[11px]">
-              {systemStatus?.engine?.mode === 'LIVE_AWS_BEDROCK' ? 'AWS Bedrock Live' : 'Bedrock Intelligent Fallback'}
-            </span>
+          <div className="hidden sm:flex items-center gap-2 px-3 py-1 rounded-md bg-slate-900 border border-slate-800 text-[11px]">
+            <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span className="text-slate-300">Patient: Eleanor Vance (72)</span>
           </div>
 
-          {/* Time & Weather */}
-          <div className="hidden lg:flex items-center gap-2 text-xs text-slate-300 font-mono px-2 py-1 rounded bg-slate-900/50 border border-slate-800">
-            <Clock className="w-3.5 h-3.5 text-cyan-400" />
-            <span>{currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-            <span className="text-slate-500">|</span>
-            <span>72°F Seattle</span>
-          </div>
-
-          {/* Voice Mute Toggle */}
           <button
             onClick={() => {
               if (isSpeechEnabled) window.speechSynthesis?.cancel();
               setIsSpeechEnabled(!isSpeechEnabled);
             }}
-            className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 transition"
-            title={isSpeechEnabled ? "Alexa Voice Output Enabled" : "Voice Output Muted"}
+            className="p-2 rounded-md hover:bg-slate-800 text-slate-400 hover:text-slate-200 transition"
+            title={isSpeechEnabled ? "Voice Audio Active" : "Voice Audio Muted"}
           >
-            {isSpeechEnabled ? <Volume2 className="w-4 h-4 text-cyan-400" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
+            {isSpeechEnabled ? <Volume2 className="w-4 h-4 text-[#00a8e1]" /> : <VolumeX className="w-4 h-4 text-slate-500" />}
           </button>
 
-          {/* Reset Demo Button */}
           <button
-            onClick={handleResetDemo}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition text-xs"
-            title="Reset Demo State to Baseline"
+            onClick={handleReset}
+            className="px-2.5 py-1 rounded-md bg-slate-800/80 hover:bg-slate-700 text-slate-300 text-[11px] transition"
+            title="Reset to default nominal state"
           >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Reset</span>
+            Reset
           </button>
 
-          {/* Judge MCP Inspector Trigger */}
           <button
             onClick={() => setIsInspectorOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-medium shadow-md shadow-cyan-600/30 transition text-xs"
+            className="flex items-center gap-1.5 px-3 py-1 rounded-md bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-slate-200 text-[11px] transition font-medium"
           >
-            <Terminal className="w-3.5 h-3.5" />
-            <span>Judge Inspector</span>
+            <Settings className="w-3.5 h-3.5 text-[#00a8e1]" />
+            <span>Developer Protocol</span>
           </button>
         </div>
       </header>
 
-      {/* MAIN TWO-COLUMN LIVING ROOM CANVAS */}
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 p-6 overflow-hidden">
+      {/* 2. MAIN 2-COLUMN VIEWPORT */}
+      <main className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-5 p-5 overflow-hidden max-w-[1720px] w-full mx-auto">
         
-        {/* LEFT COLUMN: Alexa+ Conversational Hub & Dynamic Orb (5 cols) */}
-        <section className="lg:col-span-5 flex flex-col glass-panel rounded-2xl border border-slate-800/80 p-5 shadow-2xl overflow-hidden relative">
+        {/* LEFT COLUMN: Conversational Workspace & Clinical Card Stream (5 cols) */}
+        <section className="lg:col-span-5 echo-widget flex flex-col p-4 overflow-hidden shadow-lg">
           
-          {/* Ambient Glowing Alexa+ Orb Stage */}
-          <div className="flex flex-col items-center justify-center py-6 border-b border-slate-800/60 relative">
-            <div className="relative flex items-center justify-center">
-              {/* Orb Rings */}
-              <div className={`w-32 h-32 rounded-full transition-all duration-700 flex items-center justify-center ${
-                orbState === 'EMERGENCY'
-                  ? 'bg-gradient-to-tr from-rose-600 to-red-500 alexa-orb-emergency'
-                  : orbState === 'LISTENING'
-                  ? 'bg-gradient-to-tr from-cyan-400 via-sky-500 to-blue-600 alexa-orb-listening'
-                  : orbState === 'THINKING'
-                  ? 'bg-gradient-to-tr from-purple-500 via-pink-500 to-indigo-600 alexa-orb-thinking'
-                  : orbState === 'SPEAKING'
-                  ? 'bg-gradient-to-tr from-cyan-400 to-teal-500 alexa-orb-listening'
-                  : 'bg-gradient-to-tr from-cyan-500 via-blue-600 to-indigo-700 alexa-orb-idle'
-              }`}>
-                {/* Center Core */}
-                <div className="w-20 h-20 rounded-full bg-slate-950/80 backdrop-blur-md flex items-center justify-center border border-white/20">
-                  {orbState === 'EMERGENCY' ? (
-                    <ShieldAlert className="w-8 h-8 text-rose-400 animate-bounce" />
-                  ) : orbState === 'LISTENING' ? (
-                    <Mic className="w-8 h-8 text-cyan-300 animate-pulse" />
-                  ) : orbState === 'THINKING' ? (
-                    <Sparkles className="w-8 h-8 text-purple-300 animate-spin" />
-                  ) : (
-                    <div className="w-5 h-5 rounded-full bg-cyan-400/80 shadow-lg shadow-cyan-400/50"></div>
-                  )}
-                </div>
-              </div>
+          {/* Header of Assistant Panel */}
+          <div className="echo-widget-header pb-3 mb-3 flex items-center justify-between">
+            <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
+              <span className={`w-2 h-2 rounded-full ${alexaState === 'ALERT' ? 'bg-red-500 animate-pulse' : alexaState === 'LISTENING' ? 'bg-[#00a8e1] animate-pulse' : 'bg-slate-500'}`}></span>
+              <span>Voice Interaction</span>
             </div>
+            <span className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">
+              {alexaState === 'ALERT' ? 'Critical Alert' :
+               alexaState === 'LISTENING' ? 'Listening...' :
+               alexaState === 'THINKING' ? 'Processing MCP Tool...' :
+               alexaState === 'SPEAKING' ? 'Speaking...' :
+               'Standby'}
+            </span>
+          </div>
 
-            {/* Orb Status Label */}
-            <div className="mt-4 flex items-center gap-2">
-              <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold tracking-wider uppercase font-mono ${
-                orbState === 'EMERGENCY' ? 'bg-rose-500/20 text-rose-400 border border-rose-500/40' :
-                orbState === 'LISTENING' ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40' :
-                orbState === 'THINKING' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40' :
-                orbState === 'SPEAKING' ? 'bg-teal-500/20 text-teal-300 border border-teal-500/40' :
-                'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
-              }`}>
-                {orbState === 'EMERGENCY' ? '🚨 EMERGENCY DISPATCH ACTIVE' :
-                 orbState === 'LISTENING' ? 'Listening...' :
-                 orbState === 'THINKING' ? 'Bedrock MCP Reasoning...' :
-                 orbState === 'SPEAKING' ? 'Alexa Speaking' :
-                 'Alexa+ Ready'}
-              </span>
+          {/* Sample Utterances / Test Cases */}
+          <div className="mb-3">
+            <span className="text-[10px] uppercase font-semibold tracking-wider text-slate-400 block mb-1.5">
+              Verified Utterances:
+            </span>
+            <div className="grid grid-cols-1 gap-1.5 text-[11px]">
+              <button
+                onClick={() => handleSendMessage("Alexa, I have acute chest tightness and shortness of breath")}
+                className="text-left px-2.5 py-1.5 rounded-lg bg-red-950/25 hover:bg-red-900/35 border border-red-900/40 text-red-300 transition flex items-center justify-between group"
+              >
+                <span>"I have acute chest tightness and shortness of breath"</span>
+                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 shrink-0" />
+              </button>
+              <button
+                onClick={() => handleSendMessage("Alexa, check my evening medication schedule")}
+                className="text-left px-2.5 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 text-slate-300 transition flex items-center justify-between group"
+              >
+                <span>"Check my evening medication schedule"</span>
+                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 shrink-0" />
+              </button>
+              <button
+                onClick={() => handleSendMessage("Alexa, query current vitals and glucose sensor telemetry")}
+                className="text-left px-2.5 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 text-slate-300 transition flex items-center justify-between group"
+              >
+                <span>"Query current vitals and glucose sensor telemetry"</span>
+                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 shrink-0" />
+              </button>
+              <button
+                onClick={() => handleSendMessage("Alexa, secure front entrance and adjust ambient lighting")}
+                className="text-left px-2.5 py-1.5 rounded-lg bg-slate-900/80 hover:bg-slate-800/90 border border-slate-800 text-slate-300 transition flex items-center justify-between group"
+              >
+                <span>"Secure front entrance and adjust ambient lighting"</span>
+                <ChevronRight className="w-3.5 h-3.5 opacity-60 group-hover:opacity-100 shrink-0" />
+              </button>
             </div>
           </div>
 
-          {/* Quick Voice Prompt Pills for Judges */}
-          <div className="py-3 border-b border-slate-800/60">
-            <p className="text-[11px] text-slate-400 mb-2 font-medium">Quick Test Prompts (1-Click Evaluation):</p>
-            <div className="flex flex-wrap gap-1.5">
-              {[
-                { label: "🚨 Chest Pain & Dizziness", query: "Alexa, I have sudden chest tightness and I feel dizzy" },
-                { label: "💊 Check Metformin Dose", query: "Alexa, did I take my evening Metformin pill?" },
-                { label: "💓 Vital Signs Stream", query: "Alexa, what are my current vitals and glucose?" },
-                { label: "🚪 Lock Front Door", query: "Alexa, lock the front door and set ambient lighting" },
-                { label: "🩺 Book Doctor Checkup", query: "Alexa, schedule an appointment with Dr. Chen tomorrow" }
-              ].map((chip, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleSendMessage(chip.query)}
-                  className="px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 border border-slate-700/50 text-[11px] text-slate-300 hover:text-white transition cursor-pointer"
-                >
-                  {chip.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Dialogue History Stream */}
-          <div className="flex-1 overflow-y-auto py-3 space-y-3 pr-1">
+          {/* Conversation Stream */}
+          <div className="flex-1 overflow-y-auto space-y-3 pr-1 py-1">
             {messages.map(msg => (
               <div 
-                key={msg.id} 
+                key={msg.id}
                 className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
               >
-                <div className={`max-w-[88%] rounded-2xl p-3 text-xs leading-relaxed ${
+                <div className={`max-w-[90%] rounded-xl px-3.5 py-2.5 text-xs leading-relaxed ${
                   msg.role === 'user' 
-                    ? 'bg-blue-600 text-white rounded-tr-none' 
-                    : 'glass-card text-slate-200 border border-slate-700/50 rounded-tl-none'
+                    ? 'bg-[#1b3a5b] text-white border border-[#234c75]' 
+                    : 'bg-[#182130] text-slate-200 border border-white/[0.06]'
                 }`}>
                   <p>{msg.text}</p>
 
-                  {/* Tool Call Pills */}
+                  {/* Tool Execution Markers */}
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
-                    <div className="mt-2.5 pt-2 border-t border-slate-700/50 flex flex-wrap gap-1">
-                      {msg.toolCalls.map((t, i) => (
-                        <span key={i} className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-cyan-950/70 border border-cyan-800/50 text-cyan-300 flex items-center gap-1">
-                          <Terminal className="w-2.5 h-2.5" />
-                          MCP: {t.toolName}
-                        </span>
+                    <div className="mt-2 pt-2 border-t border-white/[0.08] space-y-1">
+                      {msg.toolCalls.map((call, idx) => (
+                        <div key={idx} className="flex items-center gap-1.5 text-[10px] font-mono text-[#00a8e1]">
+                          <Terminal className="w-3 h-3 shrink-0" />
+                          <span>mcp.tools.{call.toolName}()</span>
+                        </div>
                       ))}
                     </div>
                   )}
+
+                  <span className="block mt-1.5 text-[9px] text-slate-400 font-mono text-right">
+                    {msg.timestamp}
+                  </span>
                 </div>
               </div>
             ))}
             <div ref={chatEndRef} />
           </div>
 
-          {/* Voice & Text Input Bar */}
-          <div className="pt-3 border-t border-slate-800 flex items-center gap-2">
+          {/* Input Controls */}
+          <div className="pt-3 border-t border-white/[0.06] flex items-center gap-2">
             <button
               onClick={toggleListening}
-              className={`p-3 rounded-xl transition shadow-lg ${
+              className={`p-2.5 rounded-lg transition ${
                 isListening 
-                  ? 'bg-rose-600 text-white animate-pulse shadow-rose-600/40' 
-                  : 'bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-cyan-600/30'
+                  ? 'bg-red-600 text-white animate-pulse' 
+                  : 'bg-[#00a8e1] hover:bg-[#0094c7] text-white'
               }`}
-              title="Speak to Alexa+ (Web Speech STT)"
+              title="Push to speak (Web Speech STT)"
             >
               {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
             </button>
@@ -434,274 +444,213 @@ export default function App() {
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Ask Alexa anything or test an MCP tool..."
-              className="flex-1 bg-slate-900/90 border border-slate-700/70 rounded-xl px-3.5 py-2.5 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-cyan-500 transition"
+              placeholder="Ask Alexa or invoke an MCP tool..."
+              className="flex-1 bg-slate-900 border border-white/10 rounded-lg px-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-[#00a8e1]"
             />
 
             <button
               onClick={() => handleSendMessage()}
               disabled={!inputText.trim()}
-              className="p-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-cyan-400 transition"
+              className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 disabled:opacity-40 text-slate-200 transition"
             >
-              <Send className="w-4 h-4" />
+              <Send className="w-3.5 h-3.5" />
             </button>
           </div>
         </section>
 
-        {/* RIGHT COLUMN: Multimodal APL Display & Smart Home Ecosystem (7 cols) */}
-        <section className="lg:col-span-7 flex flex-col gap-5 overflow-y-auto">
+        {/* RIGHT COLUMN: Multimodal Echo Show 15 Widgets (7 cols) */}
+        <section className="lg:col-span-7 flex flex-col gap-4 overflow-y-auto pr-1">
           
-          {/* Active Visual APL Card Stage */}
-          {activeCard && (
-            <div className={`p-5 rounded-2xl border shadow-xl transition-all duration-500 ${
-              activeCard.type === 'EMERGENCY_ALERT' 
-                ? 'bg-gradient-to-br from-rose-950/70 via-slate-900 to-slate-950 border-rose-600/60' 
-                : 'glass-panel border-cyan-800/40'
-            }`}>
-              
-              {/* Emergency Banner */}
-              {activeCard.type === 'EMERGENCY_ALERT' && (
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-rose-800/50 mb-4">
-                    <div className="flex items-center gap-2 text-rose-400 font-bold text-sm">
-                      <ShieldAlert className="w-5 h-5 animate-pulse" />
-                      <span>{activeCard.title}</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] bg-rose-500/20 text-rose-300 font-mono font-semibold">
-                      CODE RED
-                    </span>
-                  </div>
-                  <p className="text-xs text-rose-200/90 leading-relaxed mb-4">{activeCard.details}</p>
-
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div className="p-3 rounded-xl bg-slate-950/80 border border-rose-900/50">
-                      <div className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
-                        <Unlock className="w-3 h-3 text-emerald-400" />
-                        <span>SMART DOOR STATUS</span>
-                      </div>
-                      <div className="text-xs font-semibold text-emerald-400">UNLOCKED (First Responders)</div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-950/80 border border-rose-900/50">
-                      <div className="text-[10px] text-slate-400 mb-1 flex items-center gap-1">
-                        <Lightbulb className="w-3 h-3 text-amber-400" />
-                        <span>EMERGENCY LIGHTS</span>
-                      </div>
-                      <div className="text-xs font-semibold text-amber-300">ACTIVE (High Strobe)</div>
-                    </div>
-                  </div>
+          {/* Active Dynamic Card Stage */}
+          {activeCard && activeCard.type === 'EMERGENCY_ALERT' && (
+            <div className="p-4 rounded-xl bg-red-950/40 border border-red-800/80 shadow-md">
+              <div className="flex items-center justify-between pb-2.5 border-b border-red-800/40 mb-3">
+                <div className="flex items-center gap-2 text-red-400 font-semibold text-xs tracking-wide">
+                  <ShieldAlert className="w-4 h-4" />
+                  <span>EMERGENCY DISPATCH INITIATED (CODE RED)</span>
                 </div>
-              )}
-
-              {/* Medication Card */}
-              {activeCard.type === 'MEDICATION_SCHEDULE' && (
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-                    <div className="flex items-center gap-2 text-cyan-400 font-bold text-sm">
-                      <Pill className="w-5 h-5" />
-                      <span>{activeCard.title}</span>
-                    </div>
-                    <span className="text-xs text-slate-400 font-mono">Daily Adherence: 67%</span>
-                  </div>
-
-                  <div className="space-y-2.5">
-                    {activeCard.medications?.map((m) => (
-                      <div key={m.id} className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 flex items-center justify-between">
-                        <div>
-                          <div className="text-xs font-semibold text-slate-200 flex items-center gap-2">
-                            <span>{m.name}</span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 font-normal uppercase">
-                              {m.timeOfDay}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-400 mt-0.5">{m.instructions}</p>
-                        </div>
-                        <span className={`px-2 py-1 rounded-lg text-[10px] font-semibold flex items-center gap-1 ${
-                          m.taken 
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40' 
-                            : 'bg-amber-500/20 text-amber-300 border border-amber-500/40'
-                        }`}>
-                          <CheckCircle className="w-3 h-3" />
-                          {m.taken ? 'Taken' : 'Scheduled'}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                <span className="text-[10px] font-mono text-red-300">INCIDENT ID: INC-9419</span>
+              </div>
+              <p className="text-xs text-slate-200 leading-relaxed mb-3">
+                {activeCard.details}
+              </p>
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-2.5 rounded-lg bg-slate-950/70 border border-red-900/40">
+                  <span className="text-[10px] text-slate-400 block mb-0.5">Physical Access</span>
+                  <span className="font-semibold text-emerald-400">Door Unlocked for Responders</span>
                 </div>
-              )}
-
-              {/* Vitals Overview Card */}
-              {activeCard.type === 'VITALS_OVERVIEW' && (
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-                    <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
-                      <HeartPulse className="w-5 h-5" />
-                      <span>{activeCard.title}</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400 font-mono">Sensors: Nominal</span>
-                  </div>
-
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <span className="text-[10px] text-slate-400">Heart Rate</span>
-                      <div className="text-base font-bold text-slate-100 mt-0.5">{activeCard.vitals?.heartRate} bpm</div>
-                      <span className="text-[10px] text-emerald-400">Resting Normal</span>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <span className="text-[10px] text-slate-400">Blood Pressure</span>
-                      <div className="text-base font-bold text-slate-100 mt-0.5">{activeCard.vitals?.bloodPressure}</div>
-                      <span className="text-[10px] text-emerald-400">Controlled</span>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <span className="text-[10px] text-slate-400">Oxygen (SpO2)</span>
-                      <div className="text-base font-bold text-slate-100 mt-0.5">{activeCard.vitals?.spo2}</div>
-                      <span className="text-[10px] text-emerald-400">Optimal</span>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <span className="text-[10px] text-slate-400">Blood Glucose</span>
-                      <div className="text-base font-bold text-slate-100 mt-0.5">{activeCard.vitals?.bloodGlucose}</div>
-                      <span className="text-[10px] text-emerald-400">Fasting Target</span>
-                    </div>
-                  </div>
+                <div className="p-2.5 rounded-lg bg-slate-950/70 border border-red-900/40">
+                  <span className="text-[10px] text-slate-400 block mb-0.5">Primary Contact</span>
+                  <span className="font-semibold text-slate-200">David Vance (SMS & Call Sent)</span>
                 </div>
-              )}
-
-              {/* Telehealth Appointment Card */}
-              {activeCard.type === 'APPOINTMENT_CONFIRMATION' && (
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
-                    <div className="flex items-center gap-2 text-indigo-400 font-bold text-sm">
-                      <Calendar className="w-5 h-5" />
-                      <span>{activeCard.title}</span>
-                    </div>
-                    <span className="px-2 py-0.5 rounded text-[10px] bg-indigo-500/20 text-indigo-300 font-mono">
-                      SYNCED
-                    </span>
-                  </div>
-                  <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1.5 text-xs">
-                    <p><strong className="text-slate-300">Provider:</strong> {activeCard.details?.provider}</p>
-                    <p><strong className="text-slate-300">Scheduled Time:</strong> {activeCard.details?.time}</p>
-                    <p><strong className="text-slate-300">Channel:</strong> {activeCard.details?.type}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* General Morning Briefing Card */}
-              {activeCard.type === 'WELLNESS_BRIEF' && (
-                <div>
-                  <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-3">
-                    <div className="flex items-center gap-2 text-amber-300 font-bold text-sm">
-                      <Sparkles className="w-5 h-5" />
-                      <span>{activeCard.title}</span>
-                    </div>
-                    <span className="text-[11px] text-slate-400 font-mono">Ready for the day</span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <div className="text-[10px] text-slate-400">Vitals Status</div>
-                      <div className="text-sm font-semibold text-emerald-400 mt-0.5">Normal (78 bpm)</div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <div className="text-[10px] text-slate-400">Morning Meds</div>
-                      <div className="text-sm font-semibold text-cyan-300 mt-0.5">Lisinopril Taken ✓</div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800">
-                      <div className="text-[10px] text-slate-400">Environment</div>
-                      <div className="text-sm font-semibold text-slate-200 mt-0.5">72°F Comfort</div>
-                    </div>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           )}
 
-          {/* Connected Ambient Smart Home Dashboard (Ring & Alexa Devices) */}
-          <div className="p-5 rounded-2xl glass-panel border border-slate-800/80 shadow-xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800 mb-4">
-              <div className="flex items-center gap-2 text-slate-200 font-bold text-sm">
-                <Home className="w-4 h-4 text-cyan-400" />
-                <span>Ambient Smart Home & Ring Security Subsystem</span>
+          {/* Widget 1: Ring Smart Home & Physical Access Controls */}
+          <div className="echo-widget p-4 shadow-sm">
+            <div className="echo-widget-header pb-2.5 mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
+                <Shield className="w-3.5 h-3.5 text-[#00a8e1]" />
+                <span>Ring Security & Physical Home Controls</span>
               </div>
-              <span className="text-[10px] px-2 py-0.5 rounded bg-cyan-950/60 border border-cyan-800/40 text-cyan-300 font-mono">
-                MCP Device Sync
-              </span>
+              <span className="text-[10px] text-emerald-400 font-mono">Perimeter Armed</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {/* Front Door Lock */}
-              <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800">
+              {/* Smart Lock */}
+              <div className="p-3 rounded-lg bg-[#0e141f] border border-white/[0.05] flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] text-slate-400 font-medium">Front Door Lock</span>
-                  {careState?.smartHome?.frontDoorLocked ? (
-                    <Lock className="w-3.5 h-3.5 text-emerald-400" />
-                  ) : (
-                    <Unlock className="w-3.5 h-3.5 text-rose-400" />
-                  )}
+                  <span className="text-[11px] text-slate-400">Front Door</span>
+                  <button 
+                    onClick={handleToggleDoor}
+                    className="p-1 rounded hover:bg-slate-800 text-slate-300 transition"
+                    title="Toggle Lock State"
+                  >
+                    {careState?.smartHome?.frontDoorLocked ? (
+                      <Lock className="w-3.5 h-3.5 text-emerald-400" />
+                    ) : (
+                      <Unlock className="w-3.5 h-3.5 text-red-400" />
+                    )}
+                  </button>
                 </div>
-                <div className="text-xs font-bold text-slate-200">
-                  {careState?.smartHome?.frontDoorLocked ? 'SECURELY LOCKED' : 'UNLOCKED (Emergency)'}
+                <div className={`text-xs font-semibold ${careState?.smartHome?.frontDoorLocked ? 'text-slate-200' : 'text-red-400'}`}>
+                  {careState?.smartHome?.frontDoorLocked ? 'LOCKED' : 'UNLOCKED (Responders)'}
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">Ring Smart Lock Pro</p>
+                <span className="text-[9px] text-slate-400 mt-1">Ring Smart Lock Pro</span>
               </div>
 
-              {/* Ambient Lights */}
-              <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800">
+              {/* Lighting */}
+              <div className="p-3 rounded-lg bg-[#0e141f] border border-white/[0.05] flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] text-slate-400 font-medium">Ambient Lighting</span>
-                  <Lightbulb className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[11px] text-slate-400">Pathway Illumination</span>
+                  <Sun className="w-3.5 h-3.5 text-amber-400" />
                 </div>
-                <div className="text-xs font-bold text-slate-200">
-                  {careState?.smartHome?.ambientLights || 'Warm White (45%)'}
+                <div className="text-xs font-semibold text-slate-200">
+                  {careState?.smartHome?.emergencyPathwayLights ? 'EMERGENCY STROBE' : careState?.smartHome?.ambientLights || 'Warm White (45%)'}
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">Circadian Rhythm Active</p>
+                <span className="text-[9px] text-slate-400 mt-1">Circadian Ambient</span>
               </div>
 
-              {/* Thermostat */}
-              <div className="p-3 rounded-xl bg-slate-900/70 border border-slate-800">
+              {/* Climate */}
+              <div className="p-3 rounded-lg bg-[#0e141f] border border-white/[0.05] flex flex-col justify-between">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] text-slate-400 font-medium">Thermostat</span>
+                  <span className="text-[11px] text-slate-400">Climate</span>
                   <Thermometer className="w-3.5 h-3.5 text-blue-400" />
                 </div>
-                <div className="text-xs font-bold text-slate-200">
-                  {careState?.smartHome?.thermostatTemp || 72}°F (Eco-Comfort)
+                <div className="text-xs font-semibold text-slate-200">
+                  {careState?.smartHome?.thermostatTemp || 72}°F (Eco Target)
                 </div>
-                <p className="text-[10px] text-slate-500 mt-1">Amazon Smart Thermostat</p>
-              </div>
-            </div>
-
-            {/* Emergency Contacts Footer */}
-            <div className="mt-4 pt-3 border-t border-slate-800/80 flex flex-wrap items-center justify-between text-[11px] text-slate-400">
-              <div className="flex items-center gap-2">
-                <span className="text-slate-500">Care Circle:</span>
-                <span className="text-slate-300">David Vance (Son)</span>
-                <span className="text-slate-600">•</span>
-                <span className="text-slate-300">Dr. Robert Chen (PCP)</span>
-              </div>
-              <div className="text-cyan-400/80 font-mono text-[10px]">
-                Ring Camera: Armed & Monitoring
+                <span className="text-[9px] text-slate-400 mt-1">Amazon Thermostat</span>
               </div>
             </div>
           </div>
 
-          {/* Hackathon Submission Credentials & Architecture Strip */}
-          <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex flex-col sm:flex-row items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 text-cyan-400 shrink-0" />
-              <span>
-                <strong>Amazon Developer Hackathon Submission</strong>: Fully conforms to Model Context Protocol (MCP) Streamable HTTP + SSE specification with AWS Bedrock Converse API multi-agent tool execution.
+          {/* Widget 2: Continuous Physiological Telemetry */}
+          <div className="echo-widget p-4 shadow-sm">
+            <div className="echo-widget-header pb-2.5 mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
+                <Activity className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Continuous Physiological Sensor Stream</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">
+                Updated: {careState?.patient?.vitals?.lastUpdated || 'Live'}
               </span>
             </div>
-            <button
-              onClick={() => setIsInspectorOpen(true)}
-              className="text-cyan-400 hover:text-cyan-300 font-semibold underline shrink-0 cursor-pointer"
-            >
-              Open MCP Inspector →
-            </button>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              <div className="p-3 rounded-lg bg-[#0e141f] border border-white/[0.05]">
+                <span className="text-[10px] text-slate-400 block mb-1">Resting Heart Rate</span>
+                <span className="text-sm font-semibold text-slate-100">{careState?.patient?.vitals?.heartRate || 78} bpm</span>
+                <div className="mt-2 h-4 w-full flex items-end gap-0.5">
+                  {[40, 55, 70, 60, 80, 45, 65, 78, 70, 78].map((val, i) => (
+                    <div 
+                      key={i} 
+                      className="flex-1 bg-emerald-500/70 rounded-xs" 
+                      style={{ height: `${(val / 80) * 100}%` }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg bg-[#0e141f] border border-white/[0.05]">
+                <span className="text-[10px] text-slate-400 block mb-1">Blood Pressure</span>
+                <span className="text-sm font-semibold text-slate-100">{careState?.patient?.vitals?.bloodPressure || '128/82'}</span>
+                <span className="text-[9px] text-emerald-400 block mt-2">Stage 1 Controlled</span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-[#0e141f] border border-white/[0.05]">
+                <span className="text-[10px] text-slate-400 block mb-1">SpO2 Oxygen</span>
+                <span className="text-sm font-semibold text-slate-100">{careState?.patient?.vitals?.spo2 || '98%'}</span>
+                <span className="text-[9px] text-emerald-400 block mt-2">Nominal Baseline</span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-[#0e141f] border border-white/[0.05]">
+                <span className="text-[10px] text-slate-400 block mb-1">Blood Glucose</span>
+                <span className="text-sm font-semibold text-slate-100">{careState?.patient?.vitals?.bloodGlucose || '110 mg/dL'}</span>
+                <span className="text-[9px] text-emerald-400 block mt-2">Fasting Target</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Widget 3: Medication Adherence & Regimen */}
+          <div className="echo-widget p-4 shadow-sm">
+            <div className="echo-widget-header pb-2.5 mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs font-semibold text-slate-200">
+                <Pill className="w-3.5 h-3.5 text-cyan-400" />
+                <span>Daily Medication Regimen & Verification</span>
+              </div>
+              <span className="text-[10px] text-slate-400 font-mono">EHR Verified</span>
+            </div>
+
+            <div className="space-y-2">
+              {careState?.patient?.medications?.map(med => (
+                <div 
+                  key={med.id}
+                  className="p-2.5 rounded-lg bg-[#0e141f] border border-white/[0.05] flex items-center justify-between"
+                >
+                  <div className="flex items-center gap-2.5">
+                    <button
+                      onClick={() => handleToggleMedication(med.name)}
+                      className="text-slate-400 hover:text-white transition"
+                    >
+                      {med.taken ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                      ) : (
+                        <Circle className="w-4 h-4 text-slate-600" />
+                      )}
+                    </button>
+                    <div>
+                      <span className="text-xs font-medium text-slate-200 block">{med.name}</span>
+                      <span className="text-[10px] text-slate-400">{med.instructions}</span>
+                    </div>
+                  </div>
+
+                  <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium ${
+                    med.taken ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40' : 'bg-slate-800 text-slate-400'
+                  }`}>
+                    {med.taken ? 'CONFIRMED' : med.timeOfDay.toUpperCase()}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
 
         </section>
-      </div>
+      </main>
 
-      {/* DEVELOPER & JUDGE MCP INSPECTOR MODAL */}
+      {/* 3. SIGNATURE ECHO SHOW CYAN LIGHT BAR (Reacts to voice state at bottom edge) */}
+      <footer className="w-full relative">
+        <div className={`w-full ${
+          alexaState === 'ALERT' ? 'alexa-light-bar-alert' :
+          alexaState === 'LISTENING' ? 'alexa-light-bar-active' :
+          alexaState === 'THINKING' ? 'alexa-light-bar-thinking' :
+          alexaState === 'SPEAKING' ? 'alexa-light-bar-active' :
+          'alexa-light-bar-idle'
+        }`}></div>
+      </footer>
+
+      {/* DEVELOPER PROTOCOL & MCP INSPECTOR DRAWER */}
       <Inspector
         isOpen={isInspectorOpen}
         onClose={() => setIsInspectorOpen(false)}
