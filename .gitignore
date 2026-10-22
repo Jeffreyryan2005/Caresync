@@ -31,3 +31,5 @@ Thumbs.db
 *.sln
 *.sw?
 .playwright-mcp/
+*.zip
+recordings_temp/

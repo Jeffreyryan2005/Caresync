@@ -158,9 +158,14 @@ Provide an official AWS SDK utility or middleware (@aws-sdk/bedrock-mcp-adapter)
 
 ---
 
-### [Optional] Project Testing Link & Instructions
+### "Try it out" Links
+* **Live Deployment:** `https://caresync-alpha-ochre.vercel.app/`
+* **GitHub Repository:** `https://github.com/Jeffreyryan2005/Caresync`
+
+### [Optional] Project Testing Link
 ```text
-Testing Instructions:
+https://caresync-alpha-ochre.vercel.app/
+```
 Judges can test the project locally in 60 seconds with zero configuration:
 1. Clone the repository: git clone https://github.com/<your-username>/alexa-caresync.git
 2. Install dependencies: npm run install:all
