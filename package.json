@@ -1,0 +1,25 @@
+{
+  "name": "alexa-caresync",
+  "version": "1.0.0",
+  "description": "Alexa+ CareSync: Next-Gen Autonomous Health & Smart-Home Agent with Model Context Protocol (MCP) and AWS Bedrock",
+  "scripts": {
+    "install:all": "npm install && cd server && npm install && cd ../client && npm install",
+    "server": "cd server && npm run dev",
+    "client": "cd client && npm run dev",
+    "dev": "node dev-runner.js",
+    "start": "node dev-runner.js"
+  },
+  "keywords": [
+    "alexa-plus",
+    "mcp",
+    "model-context-protocol",
+    "aws-bedrock",
+    "agentic-ai",
+    "smart-home",
+    "healthcare",
+    "hackathon-winner"
+  ],
+  "author": "CareSync Team",
+  "license": "MIT",
+  "type": "module"
+}
